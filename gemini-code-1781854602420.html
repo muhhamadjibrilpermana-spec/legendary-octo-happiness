@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VoxVerse: Quantum Voxel Sculptor</title>
+    <style>
+        :root {
+            --matrix-glow: #00ff66;
+            --cosmic-glow: #ff0055;
+            --panel-border: var(--matrix-glow);
+        }
+
+        body {
+            margin: 0;
+            background-color: #05050a;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+            background-image: linear-gradient(135deg, #020205 0%, #080812 100%);
+        }
+
+        #app-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding: 30px;
+            background: rgba(10, 10, 20, 0.85);
+            border: 1px solid var(--panel-border);
+            border-radius: 16px;
+            box-shadow: 0 0 40px rgba(0, 255, 102, 0.1);
+            backdrop-filter: blur(15px);
+            transition: all 0.6s ease;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #1a1a3a;
+            padding-bottom: 15px;
+        }
+
+        .title-area h1 {
+            margin: 0;
+            font-size: 18px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            background: linear-gradient(90deg, #00ff66, #ff0055);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .title-area p {
+            margin: 5px 0 0 0;
+            font-size: 11px;
+            color: #555577;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        #engine-status {
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: var(--panel-border);
+            text-shadow: 0 0 10px var(--panel-border);
+            font-weight: bold;
+        }
+
+        canvas {
+            background: #020205;
+            border: 1px solid #1a1a3a;
+            border-radius: 8px;
+            box-shadow: inset 0 0 30px rgba(0,0,0,0.9);
+        }
+
+        .controls-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .slider-group {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+        }
+
+        .slider-group label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #8888aa;
+            min-width: 130px;
+        }
+
+        input[type=range] {
+            flex-grow: 1;
+            height: 4px;
+            background: #1a1a3a;
+            border-radius: 2px;
+            outline: none;
+            accent-color: var(--panel-border);
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<div id="app-wrapper">
+    <div class="header">
+        <div class="title-area">
+            <h1>VoxVerse: Voxel Sculptor</h1>
+            <p>3D Spatial Matrix Remapper</p>
+        </div>
+        <div id="engine-status">DIM_SHIFT: 0%</div>
+    </div>
+
+    <canvas id="voxelCanvas" width="500" height="400"></canvas>
+
+    <div class="controls-panel">
+        <div class="slider-group">
+            <label for="matrixShift">Quantum Morph</label>
+            <input type="range" id="matrixShift" min="0" max="100" value="0">
+        </div>
+        <div class="slider-group">
+            <label for="cameraRotation">Orbit View</label>
+            <input type="range" id="cameraRotation" min="0" max="360" value="45">
+        </div>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('voxelCanvas');
+    const ctx = canvas.getContext('2d');
+    const shiftSlider = document.getElementById('matrixShift');
+    const rotSlider = document.getElementById('cameraRotation');
+    const statusDisplay = document.getElementById('engine-status');
+    const appWrapper = document.getElementById('app-wrapper');
+
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // Simulation Grid Config (Lower density ensures smooth browser rendering loops)
+    const gridSize = 45; 
+    const voxelSpacing = 6;
+
+    // Define two source state matrices (RGB + Target Height)
+    const state1 = [];
+    const state2 = [];
+
+    for (let z = 0; z < gridSize; z++) {
+        for (let x = 0; x < gridSize; x++) {
+            // State 1: A Concentric Pyramid Structure (Neon Emerald tones)
+            const cx1 = gridSize / 2;
+            const cz1 = gridSize / 2;
+            const dist1 = Math.max(Math.abs(x - cx1), Math.abs(z - cz1));
+            const h1 = Math.max(0, (gridSize / 2 - dist1) * 4);
+            
+            state1.push({
+                r: 0, g: 255 - (dist1 * 10), b: 100 + (dist1 * 5),
+                h: h1
+            });
+
+            // State 2: A Sine Wave Valley Structure (Cosmic Ruby tones)
+            const h2 = (Math.sin(x * 0.3) * Math.cos(z * 0.3)) * 15 + 15;
+            state2.push({
+                r: 200 + (Math.sin(x)*55), g: 0, b: 100 + (Math.cos(z)*55),
+                h: h2
+            });
+        }
+    }
+
+    // 3D Isometric Engine (Mirrors performance array parsing from C++)
+    function renderVoxelEngine() {
+        ctx.clearRect(0, 0, width, height);
+
+        const t = parseInt(shiftSlider.value) / 100;
+        const angle = parseInt(rotSlider.value) * (Math.PI / 180);
+
+        statusDisplay.innerText = `DIM_SHIFT: ${shiftSlider.value}%`;
+
+        // Update UI styling dynamically based on interpolation progression
+        const activeColor = `style-mix(in srgb, #00ff66 ${100 - (t*100)}%, #ff0055)`;
+        appWrapper.style.setProperty('--panel-border', activeColor);
+
+        // Render back-to-front (Painter's Algorithm) to manage 3D depth layering correctly
+        const order = [];
+        for (let z = 0; z < gridSize; z++) {
+            for (let x = 0; x < gridSize; x++) {
+                // Rotational transform coordinates centered on grid midpoint
+                const rx = (x - gridSize/2) * Math.cos(angle) - (z - gridSize/2) * Math.sin(angle);
+                const rz = (x - gridSize/2) * Math.sin(angle) + (z - gridSize/2) * Math.cos(angle);
+                
+                order.push({ x, z, depth: rz, rx });
+            }
+        }
+        order.sort((a, b) => b.depth - a.depth);
+
+        // Core Matrix Projection Loop
+        for (let i = 0; i < order.length; i++) {
+            const node = order[i];
+            const index = node.z * gridSize + node.x;
+
+            const v1 = state1[index];
+            const v2 = state2[index];
+
+            // Real-Time Linear 3D Space Remapping 
+            const currentH = v1.h * (1.0 - t) + v2.h * t;
+            const r = Math.floor(v1.r * (1.0 - t) + v2.r * t);
+            const g = Math.floor(v1.g * (1.0 - t) + v2.g * t);
+            const b = Math.floor(v1.b * (1.0 - t) + v2.b * t);
+
+            // Explode transition physics midway through morph
+            const explosionFactor = Math.sin(t * Math.PI) * 45.0;
+            const dynamicSpacing = voxelSpacing + (explosionFactor * 0.1);
+
+            // Screen space calculations (Isometric View Projection Matrix)
+            const screenX = width / 2 + (node.rx * dynamicSpacing);
+            const screenY = height / 1.7 + (node.depth * dynamicSpacing * 0.5) - (currentH + explosionFactor);
+
+            // Render Node Voxel Pillar
+            const size = Math.max(1, 4 - (node.depth * 0.03));
+            ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+            ctx.fillRect(screenX, screenY, size, size * 2);
+        }
+
+        requestAnimationFrame(renderVoxelEngine);
+    }
+
+    // Fire Up Loop
+    renderVoxelEngine();
+</script>
+</body>
+</html>
